@@ -1,5 +1,10 @@
 # koubei-keyword-summary-skill
 
+[![Release](https://img.shields.io/github/v/release/sh3rlockC/koubei-keyword-summary-skill.)](https://github.com/sh3rlockC/koubei-keyword-summary-skill./releases)
+[![Downloads](https://img.shields.io/github/downloads/sh3rlockC/koubei-keyword-summary-skill./total)](https://github.com/sh3rlockC/koubei-keyword-summary-skill./releases)
+[![License](https://img.shields.io/github/license/sh3rlockC/koubei-keyword-summary-skill.)](https://github.com/sh3rlockC/koubei-keyword-summary-skill./blob/main/LICENSE)
+
+
 一个可复用的 OpenClaw Skill，用于读取汽车口碑 Excel，提炼“最满意 / 最不满意”的方向、主题、关键词、业务摘要，并导出正式交付版 Excel。
 
 ## 适用场景
