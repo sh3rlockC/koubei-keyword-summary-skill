@@ -6,6 +6,12 @@
 
 一个可复用的 OpenClaw Skill，用于读取汽车之家与懂车帝口碑 Excel，提炼高频优缺点、方向摘要、代表性原句，并默认输出**双平台整合摘要 Excel**。
 
+当前摘要层会在导出结果旁自动生成同名 `.validation.json`，用于记录输入检查、输出检查和告警。
+在交互终端运行时，脚本会自动显示进度条；也可以显式加 `--progress`。
+如果要让飞书或对话框查询进度，可加 `--progress-file` 轮询 JSON。
+如果要主动推送到通用 webhook，可加 `--progress-webhook`。
+如果要直接推送到飞书 incoming webhook，可加 `--feishu-webhook`，机器人启用了安全密钥再加 `--feishu-secret`。
+
 ## 适用场景
 
 适用于这类任务：
@@ -21,6 +27,7 @@
 ### 单平台模式（汽车之家）
 - 读取包含 `最满意` / `最不满意` 的原始口碑 Excel
 - 输出三口径方向统计、关键词、主题、业务摘要
+- 上游采集层当前通常产出 `购车口碑` / `试驾口碑` 两个 sheet，但这里不依赖 sheet 名，只依赖列契约
 
 ### 双平台模式（推荐）
 - 同时读取：
@@ -32,8 +39,9 @@
   - 跨平台对比
   - 综合业务摘要
   - 产品机会点
-  - 汽车之家满意/不满意摘要
-  - 懂车帝正向/负向摘要
+  - `汽车之家_满意摘要` / `汽车之家_不满意摘要`
+  - `懂车帝_正向摘要` / `懂车帝_负向摘要`
+- 同名路径旁会生成 `.validation.json`，便于回溯输入/输出校验结果
 
 ## 仓库结构
 
@@ -78,6 +86,57 @@ python3 skill/scripts/summarize_koubei_excel.py \
   --model-name 车型名
 ```
 
+如果要把告警也视为失败，可额外加上 `--strict-validate`。
+
+如果要显式显示进度条，可再加 `--progress`。
+
+如果要给飞书或对话框显示百分比进度，推荐再加：
+
+- `--progress-file /path/to/job.progress.json`
+- `--progress-webhook https://...`
+- `--feishu-webhook https://...`
+- `--feishu-secret <secret>`
+
+## 飞书直连
+
+脚本会把进度转换成飞书 incoming webhook 可直接接收的文本消息，例如：
+
+```json
+{
+  "msg_type": "text",
+  "timestamp": "1712476800",
+  "content": {
+    "text": "口碑摘要 37%｜启源A06\n双平台整合 · 汽车之家最满意 12/30\n说明：汽车之家最满意 12/30"
+  }
+}
+```
+
+如果飞书机器人开启了安全设置，脚本会自动补上签名字段。
+
+## 对话框轮询示例
+
+最稳的接法是让脚本写 `progress.json`，前端或对话框服务每隔 1-2 秒查询一次。
+
+后端示例：
+
+```python
+@app.get("/api/jobs/{job_id}/progress")
+def job_progress(job_id):
+    return json.loads(Path(progress_path).read_text(encoding="utf-8"))
+```
+
+前端示例：
+
+```javascript
+setInterval(async () => {
+  const res = await fetch(`/api/jobs/${jobId}/progress`);
+  const data = await res.json();
+  progressBar.value = data.percent;
+  stageLabel.textContent = data.stage;
+  detailLabel.textContent = data.message;
+}, 2000);
+```
+
 ## 双平台输出内容
 
 双平台模式默认生成这些 sheet：
@@ -91,6 +150,8 @@ python3 skill/scripts/summarize_koubei_excel.py \
 7. `汽车之家_不满意摘要`
 8. `懂车帝_正向摘要`
 9. `懂车帝_负向摘要`
+
+输出文件旁会附带同名 `.validation.json`，记录输入和输出的校验信息。
 
 ## 一页纸总结包含什么
 
