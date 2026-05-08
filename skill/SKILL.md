@@ -18,6 +18,7 @@ description: 从汽车之家与懂车帝口碑采集结果 Excel 中提炼高频
 适用结构：
 - 单 sheet / 多 sheet
 - 但必须包含 `最满意` 与 `最不满意` 两列
+- 当前上游采集层通常输出 `购车口碑` / `试驾口碑` 两个 sheet，但本脚本只依赖列契约，不依赖 sheet 名
 
 ### B. 双平台整合模式（默认推荐）
 
@@ -123,6 +124,8 @@ description: 从汽车之家与懂车帝口碑采集结果 Excel 中提炼高频
 - `懂车帝_正向摘要`
 - `懂车帝_负向摘要`
 
+同时会在同名路径旁自动生成 `.validation.json` 校验报告，记录输入检查、输出检查、告警与错误。
+
 默认命名示例：
 - `启源A06_双平台口碑摘要.xlsx`
 
@@ -159,6 +162,45 @@ python3 skills/koubei-keyword-summary/scripts/summarize_koubei_excel.py \
   --model-name 启源A06
 ```
 
+### 进度条
+
+- 默认在交互终端自动显示进度条
+- 如果要强制显示，可加 `--progress`
+- 进度条覆盖输入读取、汽车之家方向统计、懂车帝长评拆分等长循环
+- 如果要给飞书或对话框查询，可额外加 `--progress-file`，脚本会持续写同名 JSON 进度文件，建议前端或对话框服务每 1-2 秒轮询一次
+- 如果要直接推送到通用 webhook，可加 `--progress-webhook`
+- 如果要直接推送到飞书 incoming webhook，可加 `--feishu-webhook`，如机器人启用了签名再加 `--feishu-secret`
+- `--progress-file`、`--progress-webhook`、`--feishu-webhook` 可以同时开，文件适合轮询，webhook 适合主动推送
+
+#### 轮询示例
+
+后端收到任务后，把 `--progress-file /tmp/job.progress.json` 传给脚本；对话框端定时读取这个文件，然后把 `percent`、`stage`、`message` 显示出来。
+
+前端轮询示例：
+
+```javascript
+setInterval(async () => {
+  const res = await fetch(`/api/jobs/${jobId}/progress`);
+  const data = await res.json();
+  setProgress(data.percent);
+  setStage(data.stage);
+  setDetail(data.message);
+}, 2000);
+```
+
+后端接口只要把进度文件内容原样返回即可：
+
+```python
+@app.get("/api/jobs/{job_id}/progress")
+def job_progress(job_id):
+    return json.loads(Path(progress_path).read_text(encoding="utf-8"))
+```
+
+#### Feishu incoming webhook 示例
+
+脚本会把进度转换成飞书机器人可接收的文本消息，不需要你自己拼消息格式。
+如果机器人配置了安全密钥，脚本会自动附带 `timestamp` 和 `sign`。
+
 ## 7. 校验要求
 
 导出前至少检查：
@@ -176,3 +218,15 @@ python3 skills/koubei-keyword-summary/scripts/summarize_koubei_excel.py \
 - 最终 Excel 是否成功生成 `一页纸总结`
 
 如果原始 Excel 缺列或为空，直接报错，不输出伪结果。
+
+### 自动校验输出
+
+脚本会自动生成同名 `.validation.json`，其中包含：
+
+- 输入文件检查结果
+- 识别到的 sheet 和行数
+- 输出 sheet 的行数和列名
+- `warnings` 与 `errors`
+
+默认情况下，输入缺列、缺 sheet、关键输出为空时会直接失败。
+如需把告警也视为失败，可加 `--strict-validate`。
